@@ -2,8 +2,6 @@ from fastapi import FastAPI, Depends, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from utils.osrm import get_route
-from fastapi import Body
 
 import models, database
 import random
@@ -12,6 +10,9 @@ import random
 database.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
+
+def health():
+    return {"status": "ok"}
 
 # -------------------- CORS --------------------
 app.add_middleware(
@@ -143,21 +144,6 @@ async def analyze(
 async def get_all_orders(db: Session = Depends(get_db)):
     return db.query(models.Order).all()
 
-@app.post("/route")
-def get_route_api(data: dict = Body(...)):
-    v_lat = data["volunteer_lat"]
-    v_lon = data["volunteer_lon"]
-    r_lat = data["restaurant_lat"]
-    r_lon = data["restaurant_lon"]
-
-    route = get_route(v_lat, v_lon, r_lat, r_lon)
-
-    return {
-        "distance_km": route["distance_km"],
-        "duration_min": route["duration_min"],
-        "geometry": route["geometry"]
-    }
-
 @app.post("/accept_order")
 async def accept_order(data: dict, db: Session = Depends(get_db)):
     order_id = data.get("order_id")
@@ -171,8 +157,7 @@ async def accept_order(data: dict, db: Session = Depends(get_db)):
 
     if order.status != "Pending":
         raise HTTPException(status_code=400, detail="Order already taken")
-    
-    
+
     order.status = "Accepted"
     db.commit()
 

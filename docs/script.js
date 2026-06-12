@@ -3,7 +3,7 @@
 // UPDATE THIS WITH YOUR PRODUCTION BACKEND URL
 const API_URL = window.location.hostname === 'localhost' 
     ? "http://localhost:8000" 
-    : "https://YOUR-BACKEND-URL.railway.app";  // Change this to your production backend URL
+    : "https://backend-production-fcb5.up.railway.app";  // Railway backend URL
 
 const VIZAG_COORDS = [17.7100, 83.3000];  // Center of the map
 

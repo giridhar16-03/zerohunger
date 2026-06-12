@@ -52,7 +52,7 @@
 <script>
 const API_URL = window.location.hostname === 'localhost' 
     ? "http://127.0.0.1:8000"
-    : "https://YOUR-BACKEND-URL.railway.app";  // Change this!
+    : "https://backend-production-fcb5.up.railway.app";  // Railway backend URL
 
 // 🔐 Guard - Only volunteers can access
 if (!localStorage.getItem("user") || localStorage.getItem("role") !== "Volunteer") {

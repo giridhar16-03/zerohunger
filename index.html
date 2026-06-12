@@ -50,9 +50,18 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // 🔐 Authentication Guard - Redirect to login if not authenticated
-        if (!localStorage.getItem("user")) {
-            window.location.href = "login.html";
+        // If user not authenticated, show Login button instead of redirecting
+        const user = localStorage.getItem("user");
+        const logoutBtn = document.querySelector('button[onclick="logout()"]');
+
+        if (!user) {
+            if (logoutBtn) logoutBtn.style.display = 'none';
+
+            const loginBtn = document.createElement('button');
+            loginBtn.innerText = 'Login';
+            loginBtn.style = 'background:#2ecc71; margin-top:10px;';
+            loginBtn.onclick = () => window.location.href = 'login.html';
+            document.querySelector('.container').appendChild(loginBtn);
         }
     </script>
     <script src="script.js"></script>

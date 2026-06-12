@@ -35,7 +35,9 @@
     <button onclick="logout()" style="background:red;">Logout</button>
 
     <script>
-        const API_URL = "http://127.0.0.1:8000";
+        const API_URL = window.location.hostname === 'localhost'
+            ? "http://127.0.0.1:8000"
+            : "https://backend-production-fcb5.up.railway.app";
 
         // 🔐 Guard
         if (!localStorage.getItem("user") || localStorage.getItem("role") !== "Restaurant") {

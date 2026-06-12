@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FoodRescue AI | Vizag</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>FoodRescue <span style="color: #4CAF50;">Vizag</span></h1>
+            <p>AI-Powered Hyper-Local Logistics</p>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <h2>Step 1: Quality Check</h2>
+                <input type="file" id="imageInput" accept="image/*">
+                <button onclick="analyzeFood()">Scan Food</button>
+                
+                <div id="result" class="hidden">
+                    <h3 id="statusText">Ready</h3>
+                    <p>Detected: <span id="foodItem">--</span></p>
+                    <p>Confidence: <span id="confScore">--</span>%</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Step 2: Driver Route</h2>
+                <div id="map"></div>
+                <div class="stats">
+                    <p><strong>Status:</strong> <span style="color:green; font-weight:bold;">Active</span></p>
+                    <p><strong>Distance:</strong> <span id="distValue">Calculating...</span></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card full-width">
+            <h2>Live Database Feed (PostgreSQL/SQLite)</h2>
+            <ul id="orderList">
+                <li>Waiting for data...</li>
+            </ul>
+        </div>
+
+        <button onclick="logout()" style="background:red; margin-top:10px;">Logout</button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 🔐 Authentication Guard - Redirect to login if not authenticated
+        if (!localStorage.getItem("user")) {
+            window.location.href = "login.html";
+        }
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>

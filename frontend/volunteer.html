@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title> Volunteer Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+
+
+    <style>
+        .route-stats {
+            background: #5a7c9e;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            display: none;
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Volunteer Panel</h1>
+        
+    </header>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Requests</h2>
+            <div id="requestList">Loading...</div>
+        </div>
+
+        <div class="card">
+            <h2>Navigation</h2>
+
+            <div id="routeStats" class="route-stats">
+                <span id="distVal">0</span> km  <span id="timeVal">0</span> mins
+            </div>
+
+            <div id="map" style="height:350px;"></div>
+
+            <div id="activeJob" class="hidden">
+                <h3>Active!</h3>
+                <p>OTP Code:
+                    <b id="otpDisplay" style="color:blue;font-size:1.5em;">--</b>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+<button onclick="logout()" style="background:red;">Logout</button>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const API_URL = "http://127.0.0.1:8000";
+
+// 🔐 Guard - Only volunteers can access this page
+if (!localStorage.getItem("user") || localStorage.getItem("role") !== "Volunteer") {
+    window.location.href = "login.html";
+}
+
+/* ---------- 1. GET VOLUNTEER LOCATION ---------- */
+const myLat = parseFloat(localStorage.getItem("myLat"));
+const myLon = parseFloat(localStorage.getItem("myLon"));
+
+if (isNaN(myLat) || isNaN(myLon)) {
+    alert("Location missing. Please login again.");
+    window.location.href = "login.html";
+}
+
+/* ---------- 2. INIT MAP ---------- */
+const map = L.map('map').setView([myLat, myLon], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+const volunteerIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
+
+L.marker([myLat, myLon], { icon: volunteerIcon })
+    .addTo(map)
+    .bindPopup("<b>Your Location</b>");
+
+let routeLine = null;
+let destMarker = null;
+
+/* ---------- 3. SHORTEST ROUTE FUNCTION ---------- */
+async function drawSmartRoute(startLat, startLon, endLat, endLon) {
+    const start = `${startLon},${startLat}`;
+    const end = `${endLon},${endLat}`;
+
+    const url = `https://router.project-osrm.org/route/v1/driving/${start};${end}?overview=full&geometries=geojson`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const coords = data.routes[0].geometry.coordinates.map(
+        c => [c[1], c[0]]
+    );
+
+    if (routeLine) map.removeLayer(routeLine);
+    if (destMarker) map.removeLayer(destMarker);
+
+    routeLine = L.polyline(coords, {
+        color: '#007bff',
+        weight: 6
+    }).addTo(map);
+
+    destMarker = L.marker([endLat, endLon])
+        .addTo(map)
+        .bindPopup("Restaurant");
+
+    map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+
+    document.getElementById("routeStats").style.display = "block";
+    document.getElementById("distVal").innerText =
+        (data.routes[0].distance / 1000).toFixed(2);
+    document.getElementById("timeVal").innerText =
+        Math.ceil(data.routes[0].duration / 60);
+}
+
+/* ---------- 4. FETCH REQUESTS ---------- */
+async function fetchRequests() {
+    const res = await fetch(API_URL + "/orders");
+    const orders = await res.json();
+
+    const list = document.getElementById("requestList");
+    list.innerHTML = "";
+
+    let hasPending = false;
+
+    orders.reverse().forEach(order => {
+        if (order.status === "Pending") {
+            hasPending = true;
+            const div = document.createElement("div");
+            div.className = "card";
+            div.style.marginBottom = "10px";
+            div.innerHTML = `
+                <h3>📦 ${order.food_item}</h3>
+                <p><b>Qty:</b> ${order.quantity}</p>
+                <button onclick="acceptOrder(${order.id}, ${order.lat}, ${order.lon})"
+                    style="background:#2ecc71;color:white;">
+                    ✅ Accept & View Route
+                </button>
+            `;
+            list.appendChild(div);
+        }
+    });
+
+    if (!hasPending) {
+        list.innerHTML = "<p style='color:gray;'>No active requests.</p>";
+    }
+}
+
+async function fetchRoute(restaurantLat, restaurantLon) {
+    navigator.geolocation.getCurrentPosition(async pos => {
+        const volunteerLat = pos.coords.latitude;
+        const volunteerLon = pos.coords.longitude;
+
+        const res = await fetch("http://127.0.0.1:8000/route", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                volunteer_lat: volunteerLat,
+                volunteer_lon: volunteerLon,
+                restaurant_lat: restaurantLat,
+                restaurant_lon: restaurantLon
+            })
+        });
+
+        const data = await res.json();
+
+        drawRouteOnMap(data.geometry);
+
+        document.getElementById("routeInfo").innerHTML =
+            `🚗 ${data.distance_km} km | ⏱️ ${data.duration_min} mins`;
+    });
+}
+
+
+/* ---------- 5. ACCEPT ORDER ---------- */
+async function acceptOrder(id, destLat, destLon) {
+    const res = await fetch(API_URL + "/accept_order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: id })
+    });
+
+    const data = await res.json();
+
+    if (data.status === "success") {
+        document.getElementById("otpDisplay").innerText = data.otp;
+        document.getElementById("activeJob").classList.remove("hidden");
+
+        drawSmartRoute(myLat, myLon, destLat, destLon);
+        setTimeout(() => map.invalidateSize(), 200);
+    }
+}
+
+/* ---------- 6. UTILS ---------- */
+function logout() {
+    localStorage.clear();
+    window.location.href = "login.html";
+}
+
+setInterval(fetchRequests, 3000);
+fetchRequests();
+</script>
+
+</body>
+</html>

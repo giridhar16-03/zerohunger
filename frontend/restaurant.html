@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Restaurant Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Restaurant Panel</h1>
+        </header>
+
+        <div class="card">
+            <h2>Publish Food Request!</h2>
+            <p id="locMsg" style="color:green; font-size:0.9em;">Using your registered location.</p>
+
+            <input type="hidden" id="lat">
+            <input type="hidden" id="lon">
+
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input type="text" id="qtyInput" placeholder="Quantity (e.g. 5kg)" style="width: 50%;">
+                <input type="text" id="timeInput" placeholder="Pickup By (e.g. 4 PM)" style="width: 50%;">
+            </div>
+
+            <input type="file" id="imageInput" accept="image/*">
+            <button onclick="analyzeFood()">Publish</button>
+        </div>
+
+        <div class="card full-width">
+            <h2>Your Orders</h2>
+            <div id="orderList"></div>
+        </div>
+    </div>
+
+    <button onclick="logout()" style="background:red;">Logout</button>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+
+        // 🔐 Guard
+        if (!localStorage.getItem("user") || localStorage.getItem("role") !== "Restaurant") {
+            window.location.href = "login.html";
+        }
+
+        // 📍 Auto-fill location
+        const myLat = localStorage.getItem("myLat");
+        const myLon = localStorage.getItem("myLon");
+
+        if (myLat) {
+            document.getElementById('lat').value = myLat;
+            document.getElementById('lon').value = myLon;
+        } else {
+            document.getElementById('locMsg').innerText = "Location not found. Please re-login.";
+        }
+
+        // 🧠 AI ANALYZE
+        async function analyzeFood() {
+            const input = document.getElementById('imageInput');
+            const qty = document.getElementById('qtyInput').value;
+            const time = document.getElementById('timeInput').value;
+            const lat = document.getElementById('lat').value;
+            const lon = document.getElementById('lon').value;
+
+            if (input.files.length === 0) return alert("Select image!");
+            if (!input.files[0].type.startsWith("image/")) return alert("Upload image only");
+            if (!qty || !time) return alert("Enter details!");
+
+            const formData = new FormData();
+            formData.append("file", input.files[0]);
+            formData.append("lat", lat);
+            formData.append("lon", lon);
+            formData.append("quantity", qty);
+            formData.append("time", time);
+
+            try {
+                const res = await fetch(API_URL + "/analyze", { method: "POST", body: formData });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    alert(data.detail);
+                    return;
+                }
+
+                alert(`Approved by AI!\nDetected: ${data.detected.join(", ")}`);
+                fetchOrders(true);
+            } catch {
+                alert("AI server error");
+            }
+        }
+
+        // 📦 FETCH ORDERS (ONLY ONE OTP)
+        async function fetchOrders(force = false) {
+            if (!force && document.activeElement.tagName === "INPUT") return;
+
+            const res = await fetch(API_URL + "/orders");
+            const orders = await res.json();
+            const list = document.getElementById('orderList');
+            list.innerHTML = "";
+
+            // 🔥 ONLY latest accepted order gets OTP
+            const latestAccepted = orders.filter(o => o.status === "Accepted").slice(-1)[0];
+            const visibleOrders = orders.filter(o => o.status === "Pending" || o.id === latestAccepted?.id);
+
+            visibleOrders.reverse().forEach(order => {
+                const div = document.createElement('div');
+                div.className = "card";
+                div.style.marginBottom = "10px";
+                div.style.borderLeft = "5px solid orange";
+
+                div.innerHTML = `
+                    <h3>${order.food_item}</h3>
+                    <p>Status: <strong>${order.status}</strong></p>
+
+                    ${
+                        order.status === "Accepted" && order.id === latestAccepted?.id
+                        ? `
+                        <div style="background:#fff3cd; padding:10px;">
+                            <p>Volunteer Here! Code:</p>
+                            <input type="text" id="otp-${order.id}" placeholder="OTP" style="width:100px">
+                            <button onclick="verifyOTP(${order.id})" style="background:orange">Verify</button>
+                        </div>
+                        `
+                        : ""
+                    }
+                `;
+
+                list.appendChild(div);
+            });
+        }
+
+        // 🔐 VERIFY OTP
+        async function verifyOTP(id) {
+            const code = document.getElementById(`otp-${id}`).value;
+            if (!code) return alert("Enter OTP");
+
+            const res = await fetch(API_URL + "/verify_otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ order_id: id, otp_code: code })
+            });
+
+            const data = await res.json();
+            if (data.status === "success") {
+                alert("Delivery Completed!");
+                fetchOrders(true);
+            } else {
+                alert("Wrong OTP");
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = "login.html";
+        }
+
+        // ⏱️ Safe polling
+        setInterval(() => {
+            if (!document.hidden) fetchOrders();
+        }, 5000);
+
+        fetchOrders();
+    </script>
+</body>
+</html>

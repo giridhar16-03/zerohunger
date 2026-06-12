@@ -1,7 +1,12 @@
 
 
 // --- CONFIGURATION ---
-const API_URL = "http://127.0.0.1:8000"; // Your Python Backend
+// For development: http://localhost:8000
+// For production: https://your-backend-url.railway.app
+const API_URL = window.location.hostname === 'localhost' 
+    ? "http://localhost:8000" 
+    : "https://your-production-url.railway.app";  // Change this to your production backend URL
+
 const VIZAG_COORDS = [17.7100, 83.3000];  // Center of the map
 
 let routeLine = null; // Global route line variable

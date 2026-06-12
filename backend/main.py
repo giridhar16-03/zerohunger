@@ -90,7 +90,6 @@ async def login(data: dict, db: Session = Depends(get_db)):
 
 # ==================== ORDER ROUTES ====================
 
-from ai import analyze_image
 from PIL import Image
 import io
 
@@ -103,6 +102,14 @@ async def analyze(
     time: str = Form(default="ASAP"),
     db: Session = Depends(get_db)
 ):
+    # Lazy import AI to avoid import-time failures in environments
+    # that lack system dependencies for OpenCV / ultralytics.
+    try:
+        from ai import analyze_image
+    except Exception as e:
+        # AI model not available in this environment
+        raise HTTPException(status_code=503, detail=f"AI unavailable: {e}")
+
     # Read image
     image_bytes = await file.read()
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
